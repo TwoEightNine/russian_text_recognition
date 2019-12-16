@@ -105,7 +105,7 @@ def get_words_from_position(im, words_positions):
 def get_letters_bounds(word):
     word = np.array(word)
     threshold = threshold_otsu(word)
-    bw_word = closing(word < threshold, square(3))
+    bw_word = closing(word < threshold, square(1))
     labels = label(bw_word)
 
     letters = []
@@ -124,9 +124,9 @@ def get_letters_from_bounds(word, letters_bounds):
     w, h = word.size
     letters = []
     for bounds in letters_bounds:
-        letters.append(word.crop((bounds[0], 0, bounds[1], h - 1)))
+        letters.append(get_unified(word.crop((bounds[0], 0, bounds[1], h - 1))))
     return letters
 
 
-# def get_letters_trimmed(letters):
-#     for letter in letters:
+def get_unified(im):
+    return im.resize((32, 32), resample=Image.BILINEAR)
