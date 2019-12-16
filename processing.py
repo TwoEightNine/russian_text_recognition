@@ -1,7 +1,9 @@
-from PIL import Image, ImageFilter
 import numpy as np
+from PIL import Image, ImageFilter
 from scipy.optimize import basinhopping
 from skimage.filters import threshold_otsu
+from skimage.measure import label, regionprops
+from skimage.morphology import closing, square
 
 
 def get_edges(im):
@@ -24,7 +26,7 @@ def get_pretty_rotated(im):
 
     result = basinhopping(to_minimize, [0], stepsize=3)
     needed_angle = int(result.x[0]) % 360
-    return im.rotate(needed_angle, fillcolor='white')
+    return im.rotate(needed_angle, resample=Image.BILINEAR)
 
 
 def get_lines_positions(im, threshold=.002):
@@ -59,9 +61,10 @@ def get_lines_from_positions(im, lines_positions):
     return lines
 
 
-def get_words_positions(line, threshold=.002):
+def get_words_positions(line, threshold=.002, space_threshold=.25):
     hist = get_histogram(get_edges(line), horiz=True)
     threshold = hist.min() + threshold * (hist.max() - hist.min())
+    space_threshold = int(round(line.size[1] * space_threshold))
     width = hist.shape[0]
     words = []
 
@@ -74,7 +77,16 @@ def get_words_positions(line, threshold=.002):
         word_start = pos
         while pos < width and hist[pos] >= threshold: pos += 1
         word_end = pos
-        words.append((word_start, word_end))
+        new_word = (word_start, word_end)
+        if len(words) != 0:
+            prev_words = words[-1]
+            if word_start - prev_words[1] < space_threshold:
+                words[-1] = (words[-1][0], word_end)
+            else:
+                words.append(new_word)
+        else:
+            words.append(new_word)
+
         if pos == width:
             break
 
@@ -88,3 +100,33 @@ def get_words_from_position(im, words_positions):
     for word in words_positions:
         words.append(im.crop((word[0], 0, word[1], h - 1)))
     return words
+
+
+def get_letters_bounds(word):
+    word = np.array(word)
+    threshold = threshold_otsu(word)
+    bw_word = closing(word < threshold, square(3))
+    labels = label(bw_word)
+
+    letters = []
+    for region in regionprops(labels):
+        # take regions with large enough areas
+        if region.area >= 100:
+            # draw rectangle around segmented coins
+            minr, minc, maxr, maxc = region.bbox
+            letters.append((minc, maxc))
+
+    letters.sort(key=lambda x: x[0])
+    return letters
+
+
+def get_letters_from_bounds(word, letters_bounds):
+    w, h = word.size
+    letters = []
+    for bounds in letters_bounds:
+        letters.append(word.crop((bounds[0], 0, bounds[1], h - 1)))
+    return letters
+
+
+# def get_letters_trimmed(letters):
+#     for letter in letters:
