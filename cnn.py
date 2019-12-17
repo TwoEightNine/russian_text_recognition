@@ -16,7 +16,7 @@ CLASSES = 'classes.data'
 
 class CNN(object):
 
-    def __init__(self, image_size=32, letters=43):
+    def __init__(self, image_size=32, letters=33):
         self.image_size = image_size
         self.letters_count = letters
         if os.path.isfile(MODEL):

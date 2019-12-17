@@ -49,8 +49,15 @@ def recognize_text(image_name):
     result_letters = []
     for line in lines:
 
-        words_positions = prc.get_words_positions(line)
-        words = prc.get_words_from_position(line, words_positions)
+        pretty_line = prc.get_pretty_sloped(line)
+        plt.figure(1)
+        plt.subplot(211)
+        plt.imshow(line, cmap='gray')
+        plt.subplot(212)
+        plt.imshow(pretty_line, cmap='gray')
+        plt.show()
+        words_positions = prc.get_words_positions(pretty_line)
+        words = prc.get_words_from_position(pretty_line, words_positions)
 
         for word in words:
             letters_bounds = prc.get_letters_bounds(word)
@@ -84,5 +91,4 @@ def retrain():
 
 
 if __name__ == "__main__":
-    # retrain()
-    print(recognize_text('sample.png'))
+    print(recognize_text('sample_cursive.png'))

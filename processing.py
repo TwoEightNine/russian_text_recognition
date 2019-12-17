@@ -1,3 +1,6 @@
+import math
+import random
+
 import numpy as np
 from PIL import Image, ImageFilter
 from scipy.optimize import basinhopping
@@ -27,7 +30,7 @@ def get_pretty_rotated(im):
 
     result = basinhopping(to_minimize, [0], stepsize=3)
     needed_angle = int(result.x[0]) % 360
-    return im.rotate(needed_angle, resample=Image.BILINEAR)
+    return im.rotate(needed_angle, resample=Image.BILINEAR, fillcolor='white')
 
 
 def get_lines_positions(im, threshold=.002):
@@ -106,8 +109,11 @@ def get_words_from_position(im, words_positions):
 def get_letters_bounds(im_word):
     word = np.array(im_word)
     threshold = threshold_otsu(word)
-    bw_word = closing(word < threshold, square(1))
+    bw_word = closing(word < threshold * .8, square(1))
     labels = label(bw_word)
+    # plt.figure(1)
+    # plt.imshow(labels)
+    # plt.show()
 
     letters = []
     for region in regionprops(labels):
@@ -115,17 +121,19 @@ def get_letters_bounds(im_word):
         if region.area >= 30:
             # draw rectangle around segmented coins
             _, letter_start, _, letter_end = region.bbox
-            new_letter = (letter_start, letter_end)
-            if len(letters) != 0:
-                prev_letter = letters[-1]
-                if new_letter[0] < prev_letter[1]:
-                    letters[-1] = (min(new_letter[0], prev_letter[0]), max(new_letter[1], prev_letter[1]))
-                else:
-                    letters.append(new_letter)
-            else:
-                letters.append(new_letter)
+            letters.append((letter_start, letter_end))
 
     letters.sort(key=lambda x: x[0])
+    processed_letters = []
+    for letter in processed_letters:
+        if len(processed_letters) != 0:
+            prev_letter = processed_letters[-1]
+            if letter[0] - prev_letter[1] < -7:
+                processed_letters[-1] = (min(letter[0], prev_letter[0]), max(letter[1], prev_letter[1]))
+            else:
+                processed_letters.append(letter)
+        else:
+            processed_letters.append(letter)
     return letters
 
 
@@ -157,3 +165,44 @@ def trim(im, background=255, thres=.99):
 
 def get_unified(im):
     return trim(im).resize((32, 32), resample=Image.BILINEAR)
+
+
+def slope(im, angle):
+    w, h = im.size
+
+    left_line = w // 2 - h // 10
+    right_line = w // 2 + h // 10
+    delta = int(round(math.tan(math.pi * angle / 180) * h))
+
+    start_points = [(left_line, 0), (left_line, h - 1), (right_line, h - 1), (right_line, 0)]
+    end_points = [(left_line + delta, 0), (left_line, h - 1), (right_line, h - 1), (right_line + delta, 0)]
+    coeffs = find_coeffs(end_points, start_points)
+
+    return im.transform((w, h), Image.PERSPECTIVE, coeffs, Image.BICUBIC, fillcolor='white')
+
+
+def find_coeffs(pa, pb):
+    '''Find coefficients for perspective transformation. From http://stackoverflow.com/a/14178717/4414003.'''
+    matrix = []
+    for p1, p2 in zip(pa, pb):
+        matrix.append([p1[0], p1[1], 1, 0, 0, 0, -p2[0] * p1[0], -p2[0] * p1[1]])
+        matrix.append([0, 0, 0, p1[0], p1[1], 1, -p2[1] * p1[0], -p2[1] * p1[1]])
+
+    A = np.matrix(matrix, dtype=np.float)
+    B = np.array(pb).reshape(8)
+
+    res = np.dot(np.linalg.inv(A.T * A) * A.T, B)
+    return np.array(res).reshape(8)
+
+
+def get_pretty_sloped(im):
+    im_edges = get_edges(im)
+
+    # we gonna maximize variance
+    def to_minimize(angle_arr):
+        return -get_histogram(slope(im_edges, angle_arr[0])).var()
+
+    result = basinhopping(to_minimize, [0], stepsize=1)
+    needed_angle = int(result.x[0])
+    print('result =', needed_angle)
+    return slope(im, needed_angle)

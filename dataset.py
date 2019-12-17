@@ -21,15 +21,15 @@ class Dataset(object):
         self.metadata = pd.read_csv(self.metadata_file_name)
 
     def add_letter(self, image, letter):
-        images_total = self.metadata.shape[0]
+        images_total = self.metadata['id'].max()
         new_id = images_total + 1
         image.save(DIR + '/' + FILE_TEMPLATE % new_id)
         self.metadata.loc[new_id] = [new_id, letter]
         self.metadata.to_csv(self.metadata_file_name, index=False)
 
     def get_data(self):
-        images_total = self.metadata.shape[0]
-        file_names = [DIR + '/' + FILE_TEMPLATE % (i + 1) for i in range(images_total)]
+        image_ids = self.metadata[COLUMN_ID]
+        file_names = [DIR + '/' + FILE_TEMPLATE % im_id for im_id in image_ids]
         file_names = np.array(file_names)
         letters = self.metadata[COLUMN_LETTER].to_numpy().reshape((-1, 1))
         return file_names, letters
