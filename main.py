@@ -6,10 +6,41 @@ import cnn
 import dataset
 import processing as prc
 
-if __name__ == "__main__":
 
+def create_dataset(image_name):
+    im = Image.open(image_name).convert('L')
+    rotated = prc.get_pretty_rotated(im)
+
+    lines_positions = prc.get_lines_positions(rotated)
+    lines = prc.get_lines_from_positions(rotated, lines_positions)
+
+    result_letters = []
+    for line in lines:
+
+        words_positions = prc.get_words_positions(line)
+        words = prc.get_words_from_position(line, words_positions)
+
+        for word in words:
+            letters_bounds = prc.get_letters_bounds(word)
+            letters = prc.get_letters_from_bounds(word, letters_bounds)
+            result_letters += letters
+
+    plt.figure(1)
+    sps = int(len(result_letters) ** .5) + 1
+    for i in range(len(result_letters)):
+        plt.subplot(sps, sps, i + 1)
+        plt.imshow(result_letters[i], cmap='gray')
+    plt.show()
+
+    ds = dataset.Dataset()
+    real_letters = input('>> ')
+    for i in range(len(real_letters)):
+        ds.add_letter(result_letters[i], real_letters[i])
+
+
+def recognize_text(image_name):
     model = cnn.CNN()
-    im = Image.open('sample.png').convert('L')
+    im = Image.open(image_name).convert('L')
     rotated = prc.get_pretty_rotated(im)
 
     lines_positions = prc.get_lines_positions(rotated)
@@ -26,8 +57,32 @@ if __name__ == "__main__":
             letters = prc.get_letters_from_bounds(word, letters_bounds)
 
             for letter in letters:
-                guessed_letter, _ = model.predict(letter)
+                guessed_letter, prob = model.predict(letter, return_probs=True)
                 result_letters.append(guessed_letter)
-        result_letters.append(' ')
+                # plt.figure(1, figsize=(12, 6))
+                # plt.subplot(211)
+                # plt.imshow(letter, cmap='gray')
+                # plt.subplot(212)
+                # for letter, prob in prob.items():
+                #     if prob > .005:
+                #         plt.bar(letter, prob)
+                # plt.show()
+            result_letters.append(' ')
+        result_letters.append('\n')
 
-    print(''.join(result_letters))
+    text = ''.join(result_letters)
+    text = text.replace('ь|', 'ы')
+    text = text.replace('ъ|', 'ы')
+    return text
+
+
+def retrain():
+    model = cnn.CNN()
+    ds = dataset.Dataset()
+    images, letters = ds.get_data()
+    model.train_and_save(images, letters)
+
+
+if __name__ == "__main__":
+    # retrain()
+    print(recognize_text('sample.png'))

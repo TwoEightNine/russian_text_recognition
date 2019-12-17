@@ -4,6 +4,7 @@ from scipy.optimize import basinhopping
 from skimage.filters import threshold_otsu
 from skimage.measure import label, regionprops
 from skimage.morphology import closing, square
+from matplotlib import pyplot as plt
 
 
 def get_edges(im):
@@ -61,7 +62,7 @@ def get_lines_from_positions(im, lines_positions):
     return lines
 
 
-def get_words_positions(line, threshold=.002, space_threshold=.25):
+def get_words_positions(line, threshold=.002, space_threshold=.2):
     hist = get_histogram(get_edges(line), horiz=True)
     threshold = hist.min() + threshold * (hist.max() - hist.min())
     space_threshold = int(round(line.size[1] * space_threshold))
@@ -102,8 +103,8 @@ def get_words_from_position(im, words_positions):
     return words
 
 
-def get_letters_bounds(word):
-    word = np.array(word)
+def get_letters_bounds(im_word):
+    word = np.array(im_word)
     threshold = threshold_otsu(word)
     bw_word = closing(word < threshold, square(1))
     labels = label(bw_word)
@@ -111,10 +112,18 @@ def get_letters_bounds(word):
     letters = []
     for region in regionprops(labels):
         # take regions with large enough areas
-        if region.area >= 100:
+        if region.area >= 30:
             # draw rectangle around segmented coins
-            minr, minc, maxr, maxc = region.bbox
-            letters.append((minc, maxc))
+            _, letter_start, _, letter_end = region.bbox
+            new_letter = (letter_start, letter_end)
+            if len(letters) != 0:
+                prev_letter = letters[-1]
+                if new_letter[0] < prev_letter[1]:
+                    letters[-1] = (min(new_letter[0], prev_letter[0]), max(new_letter[1], prev_letter[1]))
+                else:
+                    letters.append(new_letter)
+            else:
+                letters.append(new_letter)
 
     letters.sort(key=lambda x: x[0])
     return letters
@@ -128,5 +137,23 @@ def get_letters_from_bounds(word, letters_bounds):
     return letters
 
 
+def trim(im, background=255, thres=.99):
+    w, h = im.size
+    image = np.array(im)
+    left = 0
+    while image[left, :].sum() > w * background * thres:
+        left += 1
+    right = h - 1
+    while image[right, :].sum() > w * background * thres:
+        right -= 1
+    up = 0
+    while image[:, up].sum() > h * background * thres:
+        up += 1
+    down = w - 1
+    while image[:, down].sum() > h * background * thres:
+        down -= 1
+    return im.crop((up, left, down, right))
+
+
 def get_unified(im):
-    return im.resize((32, 32), resample=Image.BILINEAR)
+    return trim(im).resize((32, 32), resample=Image.BILINEAR)

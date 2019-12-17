@@ -93,7 +93,6 @@ class CNN(object):
             [np.array(Image.open(name)).reshape((self.image_size, self.image_size)) for name in image_file_names])
         images = images.reshape((-1, self.image_size, self.image_size, 1))
         images = images / 255
-        print(images)
 
         imagegen = ImageDataGenerator(
             rotation_range=10,
@@ -113,8 +112,14 @@ class CNN(object):
         network.save(MODEL)
         self.model = network
 
-    def predict(self, image):
+    def predict(self, image, return_probs=False):
         image = np.array(image).reshape((-1, self.image_size, self.image_size, 1)) / 255
         prob = self.model.predict(image)
         pos = np.argmax(prob)
-        return self.classes[pos], prob[0][pos]
+        if return_probs:
+            probs_dict = {}
+            for i in range(len(self.classes)):
+                probs_dict[self.classes[i]] = prob[0][i]
+            return self.classes[pos], probs_dict
+        else:
+            return self.classes[pos]
