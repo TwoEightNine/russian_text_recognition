@@ -9,6 +9,8 @@ from skimage.measure import label, regionprops
 from skimage.morphology import closing, square
 from matplotlib import pyplot as plt
 
+import utils
+
 
 def get_edges(im):
     return im.filter(ImageFilter.FIND_EDGES)
@@ -25,11 +27,10 @@ def get_pretty_rotated(im):
     im_edges = get_edges(im)
 
     # we gonna maximize variance
-    def to_minimize(angle_arr):
-        return -get_histogram(im_edges.rotate(angle_arr[0]))[4:-4].var()
+    def to_minimize(angle):
+        return -get_histogram(im_edges.rotate(angle))[4:-4].var()
 
-    result = basinhopping(to_minimize, [0], stepsize=3)
-    needed_angle = int(result.x[0]) % 360
+    needed_angle = utils.find_optimum(to_minimize, 0, 45, 0.5) % 360
     return im.rotate(needed_angle, resample=Image.BILINEAR, fillcolor='white')
 
 
@@ -65,7 +66,7 @@ def get_lines_from_positions(im, lines_positions):
     return lines
 
 
-def get_words_positions(line, threshold=.002, space_threshold=.2):
+def get_words_positions(line, threshold=.002, space_threshold=.15):
     hist = get_histogram(get_edges(line), horiz=True)
     threshold = hist.min() + threshold * (hist.max() - hist.min())
     space_threshold = int(round(line.size[1] * space_threshold))
@@ -182,7 +183,7 @@ def slope(im, angle):
 
 
 def find_coeffs(pa, pb):
-    '''Find coefficients for perspective transformation. From http://stackoverflow.com/a/14178717/4414003.'''
+    """Find coefficients for perspective transformation. From http://stackoverflow.com/a/14178717/4414003."""
     matrix = []
     for p1, p2 in zip(pa, pb):
         matrix.append([p1[0], p1[1], 1, 0, 0, 0, -p2[0] * p1[0], -p2[0] * p1[1]])
@@ -199,10 +200,8 @@ def get_pretty_sloped(im):
     im_edges = get_edges(im)
 
     # we gonna maximize variance
-    def to_minimize(angle_arr):
-        return -get_histogram(slope(im_edges, angle_arr[0])).var()
+    def to_minimize(angle):
+        return -get_histogram(slope(im_edges, angle), horiz=True).var()
 
-    result = basinhopping(to_minimize, [0], stepsize=1)
-    needed_angle = int(result.x[0])
-    print('result =', needed_angle)
+    needed_angle = utils.find_optimum(to_minimize, 0, 30, 0.5)
     return slope(im, needed_angle)

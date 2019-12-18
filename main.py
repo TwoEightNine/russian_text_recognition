@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 from PIL import Image
 from matplotlib import pyplot as plt
@@ -50,12 +52,12 @@ def recognize_text(image_name):
     for line in lines:
 
         pretty_line = prc.get_pretty_sloped(line)
-        plt.figure(1)
-        plt.subplot(211)
-        plt.imshow(line, cmap='gray')
-        plt.subplot(212)
-        plt.imshow(pretty_line, cmap='gray')
-        plt.show()
+        # plt.figure(1)
+        # plt.subplot(211)
+        # plt.imshow(line, cmap='gray')
+        # plt.subplot(212)
+        # plt.imshow(pretty_line, cmap='gray')
+        # plt.show()
         words_positions = prc.get_words_positions(pretty_line)
         words = prc.get_words_from_position(pretty_line, words_positions)
 
@@ -91,4 +93,9 @@ def retrain():
 
 
 if __name__ == "__main__":
-    print(recognize_text('sample_cursive.png'))
+    for file in ['sample.png', 'sample_rotated_little.png', 'sample_rotated_big.png', 'sample_cursive.png',
+                 'sample_cursive_rotated.png']:
+        print('------------------', file, '---------------------')
+        start_time = time.time()
+        print(recognize_text(file))
+        print('\n\ntook = %.3f sec' % (time.time() - start_time))
