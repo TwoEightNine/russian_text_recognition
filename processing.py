@@ -4,12 +4,46 @@ import random
 import numpy as np
 from PIL import Image, ImageFilter
 from scipy.optimize import basinhopping
+import PIL.ImageOps
 from skimage.filters import threshold_otsu
 from skimage.measure import label, regionprops
 from skimage.morphology import closing, square
 from matplotlib import pyplot as plt
 
 import utils
+
+
+def contrast(im):
+    colors = np.array(im).flatten()
+    values = np.percentile(colors, [1, 99])
+    value_from, value_to = int(round(values[0])), int(round(values[1]))
+    tga = 255 / (value_to - value_from)
+    w, h = im.size
+    for i in range(w):
+        for j in range(h):
+            pixel = im.getpixel((i, j))
+
+            pixel = (pixel - value_from) * tga
+            pixel = int(round(pixel))
+            if pixel < 0:
+                pixel = 0
+            if pixel > 255:
+                pixel = 255
+            im.putpixel((i, j), pixel)
+    return im
+
+
+def as_white_background(im):
+    colors = np.array(im).flatten()
+    median = np.percentile(colors, 50)
+    if median > 128:
+        return im
+    else:
+        return PIL.ImageOps.invert(im)
+
+
+def get_prepared(im):
+    return as_white_background(contrast(im))
 
 
 def get_edges(im):
@@ -30,7 +64,7 @@ def get_pretty_rotated(im):
     def to_minimize(angle):
         return -get_histogram(im_edges.rotate(angle))[4:-4].var()
 
-    needed_angle = utils.find_optimum(to_minimize, 0, 45, 0.5) % 360
+    needed_angle = utils.find_optimum(to_minimize, 0, 10, 0.25) % 360
     return im.rotate(needed_angle, resample=Image.BILINEAR, fillcolor='white')
 
 
@@ -69,7 +103,12 @@ def get_lines_from_positions(im, lines_positions):
 def get_words_positions(line, threshold=.002, space_threshold=.15):
     hist = get_histogram(get_edges(line), horiz=True)
     threshold = hist.min() + threshold * (hist.max() - hist.min())
-    space_threshold = int(round(line.size[1] * space_threshold))
+
+    h_hist = get_histogram(line)
+    letters_height = h_hist / h_hist.mean() / 2
+    letters_height = 1 - np.round(letters_height)
+    letters_height = letters_height.sum()
+    space_threshold = int(round(letters_height * space_threshold))
     width = hist.shape[0]
     words = []
 
@@ -110,7 +149,7 @@ def get_words_from_position(im, words_positions):
 def get_letters_bounds(im_word):
     word = np.array(im_word)
     threshold = threshold_otsu(word)
-    bw_word = closing(word < threshold * .8, square(1))
+    bw_word = closing(word < threshold, square(1))
     labels = label(bw_word)
     # plt.figure(1)
     # plt.imshow(labels)
@@ -119,7 +158,7 @@ def get_letters_bounds(im_word):
     letters = []
     for region in regionprops(labels):
         # take regions with large enough areas
-        if region.area >= 30:
+        if region.area >= 20:
             # draw rectangle around segmented coins
             _, letter_start, _, letter_end = region.bbox
             letters.append((letter_start, letter_end))
@@ -203,5 +242,5 @@ def get_pretty_sloped(im):
     def to_minimize(angle):
         return -get_histogram(slope(im_edges, angle), horiz=True).var()
 
-    needed_angle = utils.find_optimum(to_minimize, 0, 30, 0.5)
+    needed_angle = utils.find_optimum(to_minimize, 0, 10, 0.25)
     return slope(im, needed_angle)

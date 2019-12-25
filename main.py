@@ -1,8 +1,9 @@
 import time
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 from matplotlib import pyplot as plt
+from skimage.exposure import histogram
 
 import cnn
 import dataset
@@ -43,6 +44,8 @@ def create_dataset(image_name):
 def recognize_text(image_name):
     model = cnn.CNN()
     im = Image.open(image_name).convert('L')
+    im = prc.get_prepared(im)
+
     rotated = prc.get_pretty_rotated(im)
 
     lines_positions = prc.get_lines_positions(rotated)
@@ -64,6 +67,15 @@ def recognize_text(image_name):
         for word in words:
             letters_bounds = prc.get_letters_bounds(word)
             letters = prc.get_letters_from_bounds(word, letters_bounds)
+
+            # plt.figure(1)
+            # i = 1
+            # l = int(len(letters) ** .5) + 1
+            # for letter in letters:
+            #     plt.subplot(l, l, i)
+            #     i += 1
+            #     plt.imshow(letter)
+            # plt.show()
 
             for letter in letters:
                 guessed_letter, prob = model.predict(letter, return_probs=True)
@@ -93,8 +105,7 @@ def retrain():
 
 
 if __name__ == "__main__":
-    for file in ['sample.png', 'sample_rotated_little.png', 'sample_rotated_big.png', 'sample_cursive.png',
-                 'sample_cursive_rotated.png']:
+    for file in ['sample.png']:
         print('------------------', file, '---------------------')
         start_time = time.time()
         print(recognize_text(file))
