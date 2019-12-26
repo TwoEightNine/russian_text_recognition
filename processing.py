@@ -7,7 +7,7 @@ from scipy.optimize import basinhopping
 import PIL.ImageOps
 from skimage.filters import threshold_otsu
 from skimage.measure import label, regionprops
-from skimage.morphology import closing, square
+from skimage.morphology import closing, dilation, erosion, opening, square, rectangle
 from matplotlib import pyplot as plt
 
 import utils
@@ -64,7 +64,7 @@ def get_pretty_rotated(im):
     def to_minimize(angle):
         return -get_histogram(im_edges.rotate(angle))[4:-4].var()
 
-    needed_angle = utils.find_optimum(to_minimize, 0, 10, 0.25) % 360
+    needed_angle = utils.find_optimum(to_minimize, 0, 10, 0.5) % 360
     return im.rotate(needed_angle, resample=Image.BILINEAR, fillcolor='white')
 
 
@@ -100,9 +100,9 @@ def get_lines_from_positions(im, lines_positions):
     return lines
 
 
-def get_words_positions(line, threshold=.002, space_threshold=.15):
-    hist = get_histogram(get_edges(line), horiz=True)
-    threshold = hist.min() + threshold * (hist.max() - hist.min())
+def get_words_positions(line, threshold=.1, space_threshold=.3):
+    hist = get_histogram(line, horiz=True)
+    threshold = hist.max() - threshold * (hist.max() - hist.min())
 
     h_hist = get_histogram(line)
     letters_height = h_hist / h_hist.mean() / 2
@@ -114,12 +114,12 @@ def get_words_positions(line, threshold=.002, space_threshold=.15):
 
     pos = 0
     while True:
-        while pos < width and hist[pos] < threshold: pos += 1
+        while pos < width and hist[pos] >= threshold: pos += 1
         if pos == width:
             break
 
         word_start = pos
-        while pos < width and hist[pos] >= threshold: pos += 1
+        while pos < width and hist[pos] < threshold: pos += 1
         word_end = pos
         new_word = (word_start, word_end)
         if len(words) != 0:
@@ -147,12 +147,22 @@ def get_words_from_position(im, words_positions):
 
 
 def get_letters_bounds(im_word):
+    # hist = get_histogram(im_word, horiz=True)
     word = np.array(im_word)
     threshold = threshold_otsu(word)
     bw_word = closing(word < threshold, square(1))
     labels = label(bw_word)
+    # add_h = np.zeros(hist.shape)
+    # for angle in range(-10, 10, 1):
+    #     h = get_histogram(slope(im_word, angle), horiz=True)
+    #     add_h += h
     # plt.figure(1)
+    # plt.subplot(311)
     # plt.imshow(labels)
+    # plt.subplot(312)
+    # plt.plot(hist)
+    # plt.subplot(313)
+    # plt.plot(add_h)
     # plt.show()
 
     letters = []
@@ -174,7 +184,21 @@ def get_letters_bounds(im_word):
                 processed_letters.append(letter)
         else:
             processed_letters.append(letter)
-    return letters
+
+    if len(letters) == 0:
+        return letters
+
+    widths = [i[1] - i[0] for i in letters]
+    thres = np.percentile(widths, 50) * 1.75
+    sliced_letters = []
+    for l in letters:
+        width = l[1] - l[0]
+        if width > thres:
+            sliced_letters.append((l[0], l[0] + width // 2))
+            sliced_letters.append((l[1] - width // 2, l[1]))
+        else:
+            sliced_letters.append(l)
+    return sliced_letters
 
 
 def get_letters_from_bounds(word, letters_bounds):
@@ -242,5 +266,5 @@ def get_pretty_sloped(im):
     def to_minimize(angle):
         return -get_histogram(slope(im_edges, angle), horiz=True).var()
 
-    needed_angle = utils.find_optimum(to_minimize, 0, 10, 0.25)
+    needed_angle = utils.find_optimum(to_minimize, 0, 10, 0.5)
     return slope(im, needed_angle)

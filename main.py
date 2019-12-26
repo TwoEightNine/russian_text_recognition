@@ -60,8 +60,11 @@ def recognize_text(image_name):
         # plt.imshow(line, cmap='gray')
         # plt.subplot(212)
         # plt.imshow(pretty_line, cmap='gray')
-        # plt.show()
         words_positions = prc.get_words_positions(pretty_line)
+        # for wp in words_positions:
+        #     plt.plot([wp[0], wp[0]], [0, line.size[1]], color='r')
+        #     plt.plot([wp[1], wp[1]], [0, line.size[1]], color='r')
+        # plt.show()
         words = prc.get_words_from_position(pretty_line, words_positions)
 
         for word in words:
@@ -80,10 +83,10 @@ def recognize_text(image_name):
             for letter in letters:
                 guessed_letter, prob = model.predict(letter, return_probs=True)
                 result_letters.append(guessed_letter)
-                # plt.figure(1, figsize=(12, 6))
-                # plt.subplot(211)
+                # plt.figure(1)
+                # plt.subplot(121)
                 # plt.imshow(letter, cmap='gray')
-                # plt.subplot(212)
+                # plt.subplot(122)
                 # for letter, prob in prob.items():
                 #     if prob > .005:
                 #         plt.bar(letter, prob)
@@ -105,7 +108,7 @@ def retrain():
 
 
 if __name__ == "__main__":
-    for file in ['sample.png']:
+    for file in ['sample_2.png', 'sample_cursive.png', 'sample_rotated_little.png']:
         print('------------------', file, '---------------------')
         start_time = time.time()
         print(recognize_text(file))
